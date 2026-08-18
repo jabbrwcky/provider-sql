@@ -32,6 +32,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 
 	"github.com/crossplane-contrib/provider-sql/apis/namespaced/postgresql/v1alpha1"
+	"github.com/crossplane-contrib/provider-sql/pkg/clients/pool"
 	"github.com/crossplane-contrib/provider-sql/pkg/clients/xsql"
 )
 
@@ -90,7 +91,7 @@ func TestConnectServerVersionUnavailable(t *testing.T) {
 		kube:  kubeWithSecret("postgres"),
 		log:   logging.NewNopLogger(),
 		track: func(context.Context, resource.ModernManaged) error { return nil },
-		newDB: func(_ map[string][]byte, _ string, _ string) xsql.DB {
+		newDB: func(_ map[string][]byte, _ string, _ string, _ pool.Config) xsql.DB {
 			return mockDB{
 				MockGetServerVersion: func(context.Context) (int, error) { return 0, errBoom },
 			}
@@ -132,7 +133,7 @@ func TestConnectDatabaseGrantTargetsDefaultDatabase(t *testing.T) {
 		kube:  kubeWithSecret("postgres"),
 		log:   logging.NewNopLogger(),
 		track: func(context.Context, resource.ModernManaged) error { return nil },
-		newDB: func(_ map[string][]byte, database string, _ string) xsql.DB {
+		newDB: func(_ map[string][]byte, database string, _ string, _ pool.Config) xsql.DB {
 			connectedTo = database
 			return mockDB{}
 		},
@@ -181,7 +182,7 @@ func TestConnectObjectGrantTargetsGrantDatabase(t *testing.T) {
 				kube:  kubeWithSecret("postgres"),
 				log:   logging.NewNopLogger(),
 				track: func(context.Context, resource.ModernManaged) error { return nil },
-				newDB: func(_ map[string][]byte, database string, _ string) xsql.DB {
+				newDB: func(_ map[string][]byte, database string, _ string, _ pool.Config) xsql.DB {
 					connectedTo = database
 					return mockDB{}
 				},

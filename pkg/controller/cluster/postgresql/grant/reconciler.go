@@ -41,6 +41,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-sql/apis/cluster/postgresql/v1alpha1"
 	"github.com/crossplane-contrib/provider-sql/pkg/clients"
+	"github.com/crossplane-contrib/provider-sql/pkg/clients/pool"
 	"github.com/crossplane-contrib/provider-sql/pkg/clients/postgresql"
 	"github.com/crossplane-contrib/provider-sql/pkg/clients/xsql"
 )
@@ -77,7 +78,7 @@ type connector struct {
 	kube  client.Client
 	log   logging.Logger
 	track func(ctx context.Context, mg resource.LegacyManaged) error
-	newDB func(creds map[string][]byte, database string, sslmode string) xsql.DB
+	newDB func(creds map[string][]byte, database string, sslmode string, poolCfg pool.Config) xsql.DB
 }
 
 type external struct {
@@ -123,7 +124,7 @@ func (c *connector) Connect(ctx context.Context, mg *v1alpha1.Grant) (managed.Ty
 		return nil, errors.Wrap(err, errGetSecret)
 	}
 	secretData := xsql.RemapCredentialKeys(s.Data, pc.Spec.Credentials.SecretKeyMapping.ToMap())
-	xdb := c.newDB(secretData, connectDatabase(mg.Spec.ForProvider, pc.Spec.DefaultDatabase), clients.ToString(pc.Spec.SSLMode))
+	xdb := c.newDB(secretData, connectDatabase(mg.Spec.ForProvider, pc.Spec.DefaultDatabase), clients.ToString(pc.Spec.SSLMode), pc.Spec.ConnectionPool.ToPoolConfig())
 
 	// A server that cannot report its version is not a reason to fail: only
 	// table grants are version dependent, and ExpandPrivilegesWithVersion
