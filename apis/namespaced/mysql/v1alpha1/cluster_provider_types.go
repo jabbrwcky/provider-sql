@@ -45,6 +45,15 @@ type ClusterProviderConfigSpec struct {
 	// connections established with this ClusterProviderConfig.
 	// +optional
 	ConnectionPool *ConnectionPool `json:"connectionPool,omitempty"`
+
+	// SessionVariables are set as MySQL session variables (via `SET key =
+	// value`) immediately after every new physical connection is
+	// established. Values are used verbatim as the right-hand side of the
+	// SET statement, so string values must be quoted (e.g. "'NBO'"). Do not
+	// use driver-reserved DSN parameter names (e.g. tls, sql_log_bin) as
+	// keys.
+	// +optional
+	SessionVariables map[string]string `json:"sessionVariables,omitempty"`
 }
 
 // ClusterProviderCredentials required to authenticate.

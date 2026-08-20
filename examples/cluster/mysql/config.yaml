@@ -18,3 +18,9 @@ spec:
     maxIdleConnections: 5
     maxConnLifetime: 1h
     maxConnIdleTime: 10m
+  # sessionVariables are set via `SET key = value` on every new physical
+  # connection. String values must be quoted, since they are used verbatim
+  # as the right-hand side of the SET statement. Example: force Percona/Galera
+  # DDL to use Non-Blocking Operation for online schema upgrades.
+  sessionVariables:
+    wsrep_OSU_method: "'NBO'"

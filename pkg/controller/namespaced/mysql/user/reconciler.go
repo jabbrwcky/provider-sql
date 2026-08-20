@@ -95,7 +95,7 @@ func Setup(mgr ctrl.Manager, o xpcontroller.Options) error {
 type connector struct {
 	kube  client.Client
 	track func(ctx context.Context, mg resource.ModernManaged) error
-	newDB func(creds map[string][]byte, tls *string, binlog *bool, poolCfg pool.Config) xsql.DB
+	newDB func(creds map[string][]byte, tls *string, binlog *bool, poolCfg pool.Config, sessionVariables map[string]string) xsql.DB
 }
 
 var _ managed.TypedExternalConnector[*namespacedv1alpha1.User] = &connector{}
@@ -118,7 +118,7 @@ func (c *connector) Connect(ctx context.Context, mg *namespacedv1alpha1.User) (m
 	}
 
 	return &external{
-		db:   c.newDB(providerInfo.SecretData, tlsName, mg.Spec.ForProvider.BinLog, providerInfo.PoolConfig),
+		db:   c.newDB(providerInfo.SecretData, tlsName, mg.Spec.ForProvider.BinLog, providerInfo.PoolConfig, providerInfo.SessionVariables),
 		kube: c.kube,
 	}, nil
 }
