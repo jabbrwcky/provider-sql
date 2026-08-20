@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -38,7 +40,9 @@ type mySQLDB struct {
 
 // New returns a new MySQL database client. The pool config tunes the shared,
 // DSN-keyed connection pool used for all queries issued by this client.
-func New(creds map[string][]byte, tls *string, binlog *bool, poolCfg pool.Config) xsql.DB {
+// sessionVariables are set via `SET key = value` on every new physical
+// connection the pool establishes.
+func New(creds map[string][]byte, tls *string, binlog *bool, poolCfg pool.Config, sessionVariables map[string]string) xsql.DB {
 	endpoint := string(creds[xpv1.ResourceCredentialsSecretEndpointKey])
 	port := string(creds[xpv1.ResourceCredentialsSecretPortKey])
 	username := string(creds[xpv1.ResourceCredentialsSecretUserKey])
@@ -47,7 +51,7 @@ func New(creds map[string][]byte, tls *string, binlog *bool, poolCfg pool.Config
 		defaultTLS := "preferred"
 		tls = &defaultTLS
 	}
-	dsn := DSN(username, password, endpoint, port, *tls, binlog)
+	dsn := DSN(username, password, endpoint, port, *tls, binlog, sessionVariables)
 
 	return mySQLDB{
 		dsn:      dsn,
@@ -58,23 +62,31 @@ func New(creds map[string][]byte, tls *string, binlog *bool, poolCfg pool.Config
 	}
 }
 
-// DSN returns the DSN URL
-func DSN(username, password, endpoint, port, tls string, binlog *bool) string {
+// DSN returns the DSN URL. sessionVariables are appended as extra DSN query
+// params in sorted key order: go-sql-driver/mysql runs any param it doesn't
+// recognize as `SET key = value` immediately after connecting. Sorting keeps
+// the DSN deterministic, which matters because the connection pool cache key
+// is the literal DSN string.
+func DSN(username, password, endpoint, port, tls string, binlog *bool, sessionVariables map[string]string) string {
+	var b strings.Builder
 	// add timeouts to prevent orphaned statements and excessive waits on connection dial
-	params := fmt.Sprintf("tls=%s&lock_wait_timeout=%d&timeout=%s",
-		tls,
-		lockWaitTimeoutSeconds,
-		dialTimeout,
-	)
+	fmt.Fprintf(&b, "%s:%s@tcp(%s:%s)/?tls=%s&lock_wait_timeout=%d&timeout=%s",
+		username, password, endpoint, port, tls, lockWaitTimeoutSeconds, dialTimeout)
+
 	if binlog != nil {
-		params += fmt.Sprintf("&sql_log_bin=%s", strconv.FormatBool(*binlog))
+		fmt.Fprintf(&b, "&sql_log_bin=%s", strconv.FormatBool(*binlog))
 	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/?%s",
-		username,
-		password,
-		endpoint,
-		port,
-		params)
+
+	keys := make([]string, 0, len(sessionVariables))
+	for k := range sessionVariables {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(&b, "&%s=%s", url.QueryEscape(k), url.QueryEscape(sessionVariables[k]))
+	}
+
+	return b.String()
 }
 
 // ExecTx is unsupported in MySQL.

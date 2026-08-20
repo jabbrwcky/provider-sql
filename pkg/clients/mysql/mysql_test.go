@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestDSNURLEscaping(t *testing.T) {
 	rawPass := "password^"
 	tls := "true"
 	binlog := false
-	dsn := DSN(user, rawPass, endpoint, port, tls, &binlog)
+	dsn := DSN(user, rawPass, endpoint, port, tls, &binlog, nil)
 	if dsn != fmt.Sprintf("%s:%s@tcp(%s:%s)/?tls=%s&lock_wait_timeout=%d&timeout=%s&sql_log_bin=%s",
 		user,
 		rawPass,
@@ -35,7 +36,7 @@ func TestDSNURLEscapingWithoutBinLog(t *testing.T) {
 	user := "username"
 	rawPass := "password^"
 	tls := "true"
-	dsn := DSN(user, rawPass, endpoint, port, tls, nil)
+	dsn := DSN(user, rawPass, endpoint, port, tls, nil, nil)
 	if dsn != fmt.Sprintf("%s:%s@tcp(%s:%s)/?tls=%s&lock_wait_timeout=%d&timeout=%s",
 		user,
 		rawPass,
@@ -53,7 +54,7 @@ func TestDSNURLEscapingWithoutBinLog(t *testing.T) {
 // that lock_wait_timeout is carried as a session variable (issued as
 // `SET lock_wait_timeout = <n>` on connect) and timeout as the dial timeout.
 func TestDSNParsesWithLockWaitTimeout(t *testing.T) {
-	dsn := DSN("username", "password", "endpoint", "3306", "preferred", nil)
+	dsn := DSN("username", "password", "endpoint", "3306", "preferred", nil, nil)
 
 	cfg, err := mysqldriver.ParseDSN(dsn)
 	if err != nil {
@@ -66,5 +67,48 @@ func TestDSNParsesWithLockWaitTimeout(t *testing.T) {
 	}
 	if cfg.Timeout == 0 {
 		t.Errorf("dial timeout was not parsed from the DSN")
+	}
+}
+
+func TestDSNSessionVariables(t *testing.T) {
+	endpoint := "endpoint"
+	port := "3306"
+	user := "username"
+	rawPass := "password"
+	tls := "true"
+
+	dsn := DSN(user, rawPass, endpoint, port, tls, nil, map[string]string{
+		"wsrep_OSU_method": "'NBO'",
+		"sql_mode":         "'STRICT_ALL_TABLES'",
+	})
+
+	want := fmt.Sprintf("%s:%s@tcp(%s:%s)/?tls=%s&lock_wait_timeout=%d&timeout=%s&sql_mode=%s&wsrep_OSU_method=%s",
+		user, rawPass, endpoint, port, tls,
+		lockWaitTimeoutSeconds, dialTimeout,
+		url.QueryEscape("'STRICT_ALL_TABLES'"),
+		url.QueryEscape("'NBO'"))
+
+	if dsn != want {
+		t.Errorf("DSN string with session variables did not match expected output.\ngot:  %s\nwant: %s", dsn, want)
+	}
+}
+
+func TestDSNSessionVariablesDeterministicOrder(t *testing.T) {
+	endpoint := "endpoint"
+	port := "3306"
+	user := "username"
+	rawPass := "password"
+	tls := "true"
+	vars := map[string]string{
+		"c": "3",
+		"a": "1",
+		"b": "2",
+	}
+
+	first := DSN(user, rawPass, endpoint, port, tls, nil, vars)
+	for range 10 {
+		if got := DSN(user, rawPass, endpoint, port, tls, nil, vars); got != first {
+			t.Fatalf("DSN is not deterministic across calls with the same session variables.\nfirst: %s\ngot:   %s", first, got)
+		}
 	}
 }
