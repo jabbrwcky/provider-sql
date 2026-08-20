@@ -131,6 +131,17 @@ spec:
                 required:
                 - source
                 type: object
+              sessionVariables:
+                additionalProperties:
+                  type: string
+                description: |-
+                  SessionVariables are set as MySQL session variables (via `SET key =
+                  value`) immediately after every new physical connection is
+                  established. Values are used verbatim as the right-hand side of the
+                  SET statement, so string values must be quoted (e.g. "'NBO'"). Do not
+                  use driver-reserved DSN parameter names (e.g. tls, sql_log_bin) as
+                  keys.
+                type: object
               tls:
                 description: |-
                   tls=true enables TLS / SSL encrypted connection to the server.

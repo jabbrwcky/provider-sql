@@ -22,15 +22,17 @@ type ProviderInfo struct {
 	TLS                *string
 	TLSConfig          *v1alpha1.TLSConfig
 	PoolConfig         pool.Config
+	SessionVariables   map[string]string
 }
 
 func GetProviderConfig(ctx context.Context, kube client.Client, mg resource.ModernManaged) (ProviderInfo, error) {
 	var (
-		secretKey  *client.ObjectKey
-		tlsMode    *string
-		tlsConfig  *v1alpha1.TLSConfig
-		keyMapping map[string]string
-		poolConfig pool.Config
+		secretKey        *client.ObjectKey
+		tlsMode          *string
+		tlsConfig        *v1alpha1.TLSConfig
+		keyMapping       map[string]string
+		poolConfig       pool.Config
+		sessionVariables map[string]string
 	)
 
 	switch mg.GetProviderConfigReference().Kind {
@@ -54,6 +56,7 @@ func GetProviderConfig(ctx context.Context, kube client.Client, mg resource.Mode
 		tlsConfig = providerConfig.Spec.TLSConfig
 		keyMapping = providerConfig.Spec.Credentials.SecretKeyMapping.ToMap()
 		poolConfig = providerConfig.Spec.ConnectionPool.ToPoolConfig()
+		sessionVariables = providerConfig.Spec.SessionVariables
 
 	case v1alpha1.ClusterProviderConfigKind:
 		clusterProviderConfig := &v1alpha1.ClusterProviderConfig{
@@ -74,6 +77,7 @@ func GetProviderConfig(ctx context.Context, kube client.Client, mg resource.Mode
 		tlsConfig = clusterProviderConfig.Spec.TLSConfig
 		keyMapping = clusterProviderConfig.Spec.Credentials.SecretKeyMapping.ToMap()
 		poolConfig = clusterProviderConfig.Spec.ConnectionPool.ToPoolConfig()
+		sessionVariables = clusterProviderConfig.Spec.SessionVariables
 
 	default:
 		return ProviderInfo{}, errors.InvalidProviderConfigKindError(mg.GetProviderConfigReference().Kind)
@@ -95,5 +99,6 @@ func GetProviderConfig(ctx context.Context, kube client.Client, mg resource.Mode
 		TLS:                tlsMode,
 		TLSConfig:          tlsConfig,
 		PoolConfig:         poolConfig,
+		SessionVariables:   sessionVariables,
 	}, nil
 }
